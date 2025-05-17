@@ -45,19 +45,18 @@ def load_embeddings():
 
 # 📚 Cria a base FAISS
 def create_vectorstore():
-    st.info("🔄 Reindexando documentos...")
+    sidebar_status = st.sidebar.empty()
+    sidebar_progress = st.sidebar.progress(0)
+
+    sidebar_status.info("🔄 Reindexando documentos...")
     docs = []
     files = sorted(glob.glob(f"{DOCS_PATH}/*"))
-
-    # Barra de progresso
-    progress_bar = st.progress(0)
-    status_placeholder = st.empty()
     total = len(files)
 
     for i, file in enumerate(files):
         ext = os.path.splitext(file)[1].lower()
         filename = os.path.basename(file)
-        status_placeholder.markdown(f"📄 Processando: `{filename}`")
+        sidebar_status.markdown(f"📄 Processando: `{filename}`")
 
         try:
             if ext == ".pdf":
@@ -74,15 +73,14 @@ def create_vectorstore():
                 continue
 
             docs.extend(loader.load())
-
         except Exception as e:
-            st.warning(f"⚠️ Erro ao processar `{filename}`: {e}")
+            st.sidebar.warning(f"⚠️ Erro ao processar `{filename}`: {e}")
 
-        # Atualiza barra de progresso
-        progress_bar.progress((i + 1) / total)
+        sidebar_progress.progress((i + 1) / total)
 
     if not docs:
-        st.error("❌ Nenhum documento válido encontrado em ./docs")
+        sidebar_status.error("❌ Nenhum documento válido encontrado.")
+        sidebar_progress.empty()
         st.stop()
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
@@ -94,9 +92,10 @@ def create_vectorstore():
 
     st.session_state["indexed_files"] = [os.path.basename(f) for f in files if os.path.isfile(f)]
 
-    status_placeholder.success("✅ Documentos indexados com sucesso.")
-    progress_bar.empty()
+    sidebar_status.success("✅ Documentos indexados com sucesso.")
+    sidebar_progress.empty()
     return db
+
 
 
 # ✅ Carrega FAISS (sem auto verificação)
