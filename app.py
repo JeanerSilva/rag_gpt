@@ -35,6 +35,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.prompts import PromptTemplate
 
 import json
 
@@ -171,15 +173,35 @@ else:
 llm = load_llm()
 vectorstore = load_vectorstore()
 
+
+# Prompt 
+custom_prompt = PromptTemplate(
+    input_variables=["context", "question"],
+    template="""
+Você é um assistente especializado em planejamento público e está respondendo a uma pergunta com base nos trechos de documentos oficiais abaixo.
+
+🔹 **Contexto** (extraído dos documentos indexados):
+{context}
+
+🔹 **Pergunta do usuário:**
+{question}
+
+💡 **Instruções**:
+- Responda de forma clara, objetiva e embasada.
+- Utilize o conteúdo dos documentos como referência principal.
+- Se necessário, cite trechos ou dados para justificar sua resposta.
+- Se os documentos não contiverem informações suficientes, informe isso de forma clara — mas não invente.
+
+📝 **Resposta**:
+"""
+
 # 🔁 RAG Chain
-if vectorstore:
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=vectorstore.as_retriever(search_type="similarity", k=4),
-        return_source_documents=True
-    )
-else:
-    qa_chain = None
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=vectorstore.as_retriever(search_type="similarity", k=6),
+    return_source_documents=True,
+    chain_type_kwargs={"prompt": custom_prompt}
+)
 
 # 🧠 Interface
 st.title("Pergunte ao PPA")
