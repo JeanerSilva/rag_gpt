@@ -11,6 +11,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from rag.utils import save_indexed_files
 from rag.embeddings import load_embeddings
 
+from settings import CHUNK_SIZE, CHUNK_OVERLAP
+
 def create_vectorstore():
     sidebar_status = st.sidebar.empty()
     sidebar_progress = st.sidebar.progress(0)
@@ -49,7 +51,8 @@ def create_vectorstore():
         sidebar_progress.empty()
         st.stop()
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE , chunk_overlap=CHUNK_OVERLAP)
+
     chunks = splitter.split_documents(docs)
     db = FAISS.from_documents(chunks, load_embeddings())
     db.save_local(VECTORDB_PATH)
