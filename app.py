@@ -11,7 +11,9 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
     UnstructuredWordDocumentLoader,
     UnstructuredExcelLoader,
+    UnstructuredHTMLLoader
 )
+
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
@@ -67,9 +69,12 @@ def create_vectorstore():
             loader = UnstructuredWordDocumentLoader(file)
         elif ext == ".xlsx":
             loader = UnstructuredExcelLoader(file)
+        elif ext == ".html":
+            loader = UnstructuredHTMLLoader(file)  # 👈 SUPORTE HTML
         else:
             continue
         docs.extend(loader.load())
+
 
     if not docs:
         st.error("❌ Nenhum documento válido encontrado em ./docs")
@@ -119,10 +124,11 @@ def load_vectorstore():
 # 📤 Upload pela sidebar
 st.sidebar.header("📤 Enviar documentos")
 uploaded_files = st.sidebar.file_uploader(
-    "Escolha arquivos (.pdf, .txt, .docx, .xlsx)",
-    type=["pdf", "txt", "docx", "xlsx"],
+    "Escolha arquivos (.pdf, .txt, .docx, .xlsx, .html)",
+    type=["pdf", "txt", "docx", "xlsx", "html"],
     accept_multiple_files=True
 )
+
 
 if uploaded_files:
     for file in uploaded_files:
