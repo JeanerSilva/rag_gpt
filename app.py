@@ -154,12 +154,18 @@ if st.sidebar.button("🔁 Reindexar agora"):
 
 
 # 📂 Arquivos indexados
-st.sidebar.markdown("📂 **Arquivos indexados:**")
-if st.session_state["indexed_files"]:
-    for f in st.session_state["indexed_files"]:
-        st.sidebar.markdown(f"- `{f}`")
+indexed_files = st.session_state.get("indexed_files", [])
+
+if indexed_files:
+    st.sidebar.markdown("📂 **Arquivos indexados:**", unsafe_allow_html=True)
+    styled_list = "<ul style='padding-left: 1.2em; margin-top: 0.2em;'>"
+    for f in indexed_files:
+        styled_list += f"<li style='font-size: 0.8em; margin-bottom: 0.1em;'>{f}</li>"
+    styled_list += "</ul>"
+    st.sidebar.markdown(styled_list, unsafe_allow_html=True)
 else:
-    st.sidebar.info("Nenhum arquivo indexado ainda.")
+    st.sidebar.markdown("📂 Nenhum arquivo indexado.")
+
 
 # 🚀 Inicializa o LLM
 llm = load_llm()
