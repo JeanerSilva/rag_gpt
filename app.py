@@ -47,23 +47,39 @@ def load_embeddings():
 def create_vectorstore():
     st.info("🔄 Reindexando documentos...")
     docs = []
-    files = glob.glob(f"{DOCS_PATH}/*")
+    files = sorted(glob.glob(f"{DOCS_PATH}/*"))
 
-    for file in files:
+    # Barra de progresso
+    progress_bar = st.progress(0)
+    status_placeholder = st.empty()
+    total = len(files)
+
+    for i, file in enumerate(files):
         ext = os.path.splitext(file)[1].lower()
-        if ext == ".pdf":
-            loader = PyPDFLoader(file)
-        elif ext == ".txt":
-            loader = TextLoader(file)
-        elif ext == ".docx":
-            loader = UnstructuredWordDocumentLoader(file)
-        elif ext == ".xlsx":
-            loader = UnstructuredExcelLoader(file)
-        elif ext == ".html":
-            loader = UnstructuredHTMLLoader(file)
-        else:
-            continue
-        docs.extend(loader.load())
+        filename = os.path.basename(file)
+        status_placeholder.markdown(f"📄 Processando: `{filename}`")
+
+        try:
+            if ext == ".pdf":
+                loader = PyPDFLoader(file)
+            elif ext == ".txt":
+                loader = TextLoader(file)
+            elif ext == ".docx":
+                loader = UnstructuredWordDocumentLoader(file)
+            elif ext == ".xlsx":
+                loader = UnstructuredExcelLoader(file)
+            elif ext == ".html":
+                loader = UnstructuredHTMLLoader(file)
+            else:
+                continue
+
+            docs.extend(loader.load())
+
+        except Exception as e:
+            st.warning(f"⚠️ Erro ao processar `{filename}`: {e}")
+
+        # Atualiza barra de progresso
+        progress_bar.progress((i + 1) / total)
 
     if not docs:
         st.error("❌ Nenhum documento válido encontrado em ./docs")
@@ -76,11 +92,12 @@ def create_vectorstore():
     db = FAISS.from_documents(chunks, embeddings)
     db.save_local(VECTORDB_PATH)
 
-    # Atualiza a lista de arquivos para exibir na interface
     st.session_state["indexed_files"] = [os.path.basename(f) for f in files if os.path.isfile(f)]
 
-    st.success("✅ Documentos indexados com sucesso.")
+    status_placeholder.success("✅ Documentos indexados com sucesso.")
+    progress_bar.empty()
     return db
+
 
 # ✅ Carrega FAISS (sem auto verificação)
 def load_vectorstore():
@@ -93,6 +110,7 @@ def load_vectorstore():
     st.session_state["indexed_files"] = [os.path.basename(f) for f in files if os.path.isfile(f)]
     return FAISS.load_local(VECTORDB_PATH, embeddings, allow_dangerous_deserialization=True)
 
+# 📤 Upload
 # 📤 Upload
 st.sidebar.header("📤 Enviar documentos")
 uploaded_files = st.sidebar.file_uploader(
@@ -108,10 +126,19 @@ if uploaded_files:
             f.write(file.getvalue())
     st.sidebar.success("✅ Arquivos enviados com sucesso.")
 
-# 🔘 Botão manual para reindexar
+# 🔘 Reindexar manualmente
 if st.sidebar.button("🔁 Reindexar agora"):
     create_vectorstore()
     st.rerun()
+
+# 📂 Arquivos indexados
+st.sidebar.markdown("📂 **Arquivos indexados:**")
+if "indexed_files" in st.session_state and st.session_state["indexed_files"]:
+    for f in st.session_state["indexed_files"]:
+        st.sidebar.markdown(f"- `{f}`")
+else:
+    st.sidebar.info("Nenhum arquivo indexado ainda.")
+
 
 # 🚀 Inicializa o LLM
 llm = load_llm()
@@ -128,15 +155,8 @@ else:
     qa_chain = None
 
 # 🧠 Interface
-st.title("🧠 Chat com seus Documentos (RAG + GPT)")
+st.title("Pergunte ao PPA")
 
-# 📂 Arquivos indexados
-if "indexed_files" in st.session_state and st.session_state["indexed_files"]:
-    st.markdown("📁 **Arquivos indexados:**")
-    for f in st.session_state["indexed_files"]:
-        st.markdown(f"- `{f}`")
-else:
-    st.warning("⚠️ Nenhum arquivo foi indexado ainda.")
 
 # 💬 Histórico
 if "chat_history" not in st.session_state:
