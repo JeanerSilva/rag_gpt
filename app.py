@@ -2,25 +2,6 @@ import os
 import glob
 import streamlit as st
 
-st.set_page_config(page_title="Pergunte ao PPA", page_icon="")
-
-import json
-
-INDEXED_LIST_PATH = "indexed_files.json"
-
-def save_indexed_files(file_list):
-    with open(INDEXED_LIST_PATH, "w", encoding="utf-8") as f:
-        json.dump(file_list, f, ensure_ascii=False, indent=2)
-
-def load_indexed_files():
-    if os.path.exists(INDEXED_LIST_PATH):
-        with open(INDEXED_LIST_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-if "indexed_files" not in st.session_state:
-    st.session_state["indexed_files"] = load_indexed_files()
-
 from dotenv import load_dotenv
 from langchain_community.document_loaders import (
     TextLoader,
@@ -39,6 +20,24 @@ from langchain.chains import RetrievalQAWithSourcesChain
 from langchain.prompts import PromptTemplate
 
 import json
+
+# Configuração Básica
+INDEXED_LIST_PATH = "indexed_files.json"
+st.set_page_config(page_title="Pergunte ao PPA", page_icon="")
+
+def save_indexed_files(file_list):
+    with open(INDEXED_LIST_PATH, "w", encoding="utf-8") as f:
+        json.dump(file_list, f, ensure_ascii=False, indent=2)
+
+def load_indexed_files():
+    if os.path.exists(INDEXED_LIST_PATH):
+        with open(INDEXED_LIST_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+if "indexed_files" not in st.session_state:
+    st.session_state["indexed_files"] = load_indexed_files()
+
 
 # 🔐 API
 load_dotenv()
