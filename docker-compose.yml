@@ -1,0 +1,13 @@
+services:
+  rag-app:
+    build: .
+    container_name: rag_gpt
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./docs:/app/docs
+      - ./vectordb:/app/vectordb
+      - ./.env:/app/.env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped

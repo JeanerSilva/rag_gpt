@@ -14,3 +14,13 @@ streamlit run app.py
 
 #Sair
 deactivate
+
+
+# Com container
+
+docker-compose build
+docker-compose up
+http://localhost:8501
+
+
+docker compose -f 'docker-compose.yml' up -d --build 
