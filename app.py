@@ -194,6 +194,7 @@ Você é um assistente especializado em planejamento público e está respondend
 
 📝 **Resposta**:
 """
+)
 
 # 🔁 RAG Chain
 qa_chain = RetrievalQA.from_chain_type(
