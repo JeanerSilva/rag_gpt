@@ -1,0 +1,16 @@
+
+# Ativar o ambiente virtual
+python -m venv .venv
+.venv\Scripts\activate
+
+# Preparar ambiente
+pip install --upgrade pip
+pip install -r requirements.txt
+
+#pip install sentence-transformers
+
+#Rodar
+streamlit run app.py
+
+#Sair
+deactivate

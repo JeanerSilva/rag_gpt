@@ -1,0 +1,13 @@
+langchain>=0.1.20
+langchain-core>=0.1.36
+langchain-community>=0.0.33
+langchain-openai>=0.1.4
+openai>=1.13.3
+
+faiss-cpu
+unstructured
+pdfminer.six
+tqdm
+streamlit
+python-dotenv
+sentence-transformers
