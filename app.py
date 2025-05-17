@@ -1,6 +1,5 @@
 import os
 import glob
-import hashlib
 import streamlit as st
 
 st.set_page_config(page_title="Pergunte ao PPA", page_icon="")
@@ -20,7 +19,7 @@ from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
 from langchain_huggingface import HuggingFaceEmbeddings
 
-# 🔐 Carrega a chave da API
+# 🔐 API
 load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY")
 
@@ -44,15 +43,6 @@ def load_llm():
 def load_embeddings():
     return HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
-# 🔍 Hash dos arquivos
-def hash_file_list(folder):
-    files = sorted(glob.glob(f"{folder}/*"))
-    hash_input = "".join(
-        f"{os.path.basename(f)}-{os.path.getmtime(f)}"
-        for f in files if os.path.isfile(f)
-    )
-    return hashlib.md5(hash_input.encode()).hexdigest()
-
 # 📚 Cria a base FAISS
 def create_vectorstore():
     st.info("🔄 Reindexando documentos...")
@@ -70,11 +60,10 @@ def create_vectorstore():
         elif ext == ".xlsx":
             loader = UnstructuredExcelLoader(file)
         elif ext == ".html":
-            loader = UnstructuredHTMLLoader(file)  # 👈 SUPORTE HTML
+            loader = UnstructuredHTMLLoader(file)
         else:
             continue
         docs.extend(loader.load())
-
 
     if not docs:
         st.error("❌ Nenhum documento válido encontrado em ./docs")
@@ -86,93 +75,62 @@ def create_vectorstore():
     embeddings = load_embeddings()
     db = FAISS.from_documents(chunks, embeddings)
     db.save_local(VECTORDB_PATH)
+
+    # Atualiza a lista de arquivos para exibir na interface
+    st.session_state["indexed_files"] = [os.path.basename(f) for f in files if os.path.isfile(f)]
+
+    st.success("✅ Documentos indexados com sucesso.")
     return db
 
-# ✅ Carrega ou recria FAISS
+# ✅ Carrega FAISS (sem auto verificação)
 def load_vectorstore():
-    current_hash = hash_file_list(DOCS_PATH)
+    if not os.path.exists(os.path.join(VECTORDB_PATH, "index.faiss")):
+        st.warning("⚠️ Nenhuma base vetorial encontrada. Clique em '🔁 Reindexar agora'.")
+        return None
+
+    embeddings = load_embeddings()
     files = sorted(glob.glob(f"{DOCS_PATH}/*"))
-    file_names = [os.path.basename(f) for f in files if os.path.isfile(f)]
-
-    force = st.session_state.pop("force_reindex", False)
-
-    hash_changed = (
-        "last_docs_hash" not in st.session_state or
-        st.session_state["last_docs_hash"] != current_hash or
-        not os.path.exists(os.path.join(VECTORDB_PATH, "index.faiss")) or
-        force  # 👈 força manual
-    )
-
-    if hash_changed:
-        st.session_state["last_docs_hash"] = current_hash
-        st.session_state["indexed_files"] = file_names
-        return create_vectorstore()
-
-    if "indexed_files" not in st.session_state:
-        st.session_state["indexed_files"] = file_names
-
-    embeddings = load_embeddings()
+    st.session_state["indexed_files"] = [os.path.basename(f) for f in files if os.path.isfile(f)]
     return FAISS.load_local(VECTORDB_PATH, embeddings, allow_dangerous_deserialization=True)
 
-
-    if "indexed_files" not in st.session_state:
-        st.session_state["indexed_files"] = file_names
-
-    embeddings = load_embeddings()
-    return FAISS.load_local(VECTORDB_PATH, embeddings, allow_dangerous_deserialization=True)
-
-# 📤 Upload pela sidebar
+# 📤 Upload
 st.sidebar.header("📤 Enviar documentos")
 uploaded_files = st.sidebar.file_uploader(
-    "Escolha arquivos (.pdf, .txt, .docx, .xlsx, .html)",
+    "Arquivos permitidos: .pdf, .txt, .docx, .xlsx, .html",
     type=["pdf", "txt", "docx", "xlsx", "html"],
     accept_multiple_files=True
 )
-
 
 if uploaded_files:
     for file in uploaded_files:
         file_path = os.path.join(DOCS_PATH, file.name)
         with open(file_path, "wb") as f:
             f.write(file.getvalue())
-    st.sidebar.success("✅ Arquivos enviados.")
-    if "last_docs_hash" in st.session_state:
-        del st.session_state["last_docs_hash"]
-    st.rerun()
+    st.sidebar.success("✅ Arquivos enviados com sucesso.")
 
-# 🔘 Botão para reindexar manualmente
+# 🔘 Botão manual para reindexar
 if st.sidebar.button("🔁 Reindexar agora"):
-    # Remove o hash anterior para forçar a reindexação
-    if "last_docs_hash" in st.session_state:
-        del st.session_state["last_docs_hash"]
-
-    # Atualiza lista de arquivos
-    files = sorted(glob.glob(f"{DOCS_PATH}/*"))
-    file_names = [os.path.basename(f) for f in files if os.path.isfile(f)]
-    st.session_state["indexed_files"] = file_names
-
-    # Força mensagem de reindexação via variável de estado
-    st.session_state["force_reindex"] = True
-
-    # Recarrega o app
+    create_vectorstore()
     st.rerun()
 
-
-# 🚀 Inicializa
+# 🚀 Inicializa o LLM
 llm = load_llm()
 vectorstore = load_vectorstore()
 
-# 🔁 Chain com retorno de fontes
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=vectorstore.as_retriever(search_type="similarity", k=4),
-    return_source_documents=True
-)
+# 🔁 RAG Chain
+if vectorstore:
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=vectorstore.as_retriever(search_type="similarity", k=4),
+        return_source_documents=True
+    )
+else:
+    qa_chain = None
 
-# 🧠 Interface principal
+# 🧠 Interface
 st.title("🧠 Chat com seus Documentos (RAG + GPT)")
 
-# 📂 Lista de arquivos indexados
+# 📂 Arquivos indexados
 if "indexed_files" in st.session_state and st.session_state["indexed_files"]:
     st.markdown("📁 **Arquivos indexados:**")
     for f in st.session_state["indexed_files"]:
@@ -184,26 +142,27 @@ else:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# 📝 Entrada do usuário
-with st.form("chat-form", clear_on_submit=True):
-    user_input = st.text_input("Digite sua pergunta:")
-    submitted = st.form_submit_button("Enviar")
+# 📝 Entrada
+if qa_chain:
+    with st.form("chat-form", clear_on_submit=True):
+        user_input = st.text_input("Digite sua pergunta:")
+        submitted = st.form_submit_button("Enviar")
 
-if submitted and user_input:
-    result = qa_chain(user_input)
-    resposta = result["result"]
-    fontes = result["source_documents"]
+    if submitted and user_input:
+        result = qa_chain(user_input)
+        resposta = result["result"]
+        fontes = result["source_documents"]
 
-    st.session_state.chat_history.append(("user", user_input))
-    st.session_state.chat_history.append(("bot", resposta))
-    st.session_state.last_contexts = fontes
+        st.session_state.chat_history.append(("user", user_input))
+        st.session_state.chat_history.append(("bot", resposta))
+        st.session_state.last_contexts = fontes
 
 # 💬 Mostrar histórico
 for role, msg in st.session_state.chat_history:
     with st.chat_message("user" if role == "user" else "assistant"):
         st.markdown(msg)
 
-# 📄 Mostrar fontes usadas
+# 📄 Fontes usadas
 if "last_contexts" in st.session_state:
     with st.expander("📚 Trechos usados na resposta"):
         for doc in st.session_state.last_contexts:
@@ -212,7 +171,7 @@ if "last_contexts" in st.session_state:
             st.markdown(doc.page_content.strip())
             st.markdown("---")
 
-# 🧹 Botão limpar
+# 🧹 Limpar conversa
 if st.button("🧹 Limpar conversa"):
     st.session_state.chat_history = []
     st.session_state.last_contexts = []
@@ -221,8 +180,7 @@ if st.button("🧹 Limpar conversa"):
     except AttributeError:
         st.experimental_rerun()
 
-
-# 💾 Download da última resposta
+# 💾 Download
 if st.session_state.chat_history:
     for role, msg in reversed(st.session_state.chat_history):
         if role == "bot":
