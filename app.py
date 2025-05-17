@@ -16,6 +16,19 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 # Upload
+
+# ⚙️ Configuração dinâmica do 'k'
+st.sidebar.markdown("⚙️ **Configurações**")
+k_value = st.sidebar.number_input(
+    label="Número de trechos a considerar (k)",
+    min_value=1,
+    max_value=20,
+    value=st.session_state.get("retriever_k", 6),
+    step=1,
+    key="retriever_k"
+)
+
+
 st.sidebar.header("📤 Enviar documentos")
 uploaded_files = st.sidebar.file_uploader(
     "Arquivos: .pdf, .txt, .docx, .xlsx, .html",
