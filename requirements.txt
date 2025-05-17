@@ -11,3 +11,8 @@ tqdm
 streamlit
 python-dotenv
 sentence-transformers
+
+unstructured[local-inference]
+python-docx
+openpyxl
+langchain-huggingface>=0.0.2
