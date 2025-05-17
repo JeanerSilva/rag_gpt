@@ -111,6 +111,10 @@ def create_vectorstore():
 
     st.session_state["indexed_files"] = [os.path.basename(f) for f in files if os.path.isfile(f)]
 
+    indexed_list = [os.path.basename(f) for f in files if os.path.isfile(f)]
+    st.session_state["indexed_files"] = indexed_list
+    save_indexed_files(indexed_list)  # 👈 salvar em disco
+
     sidebar_status.success("✅ Documentos indexados com sucesso.")
     sidebar_progress.empty()
     return db
@@ -147,7 +151,7 @@ if uploaded_files:
 # 🔘 Reindexar manualmente
 if st.sidebar.button("🔁 Reindexar agora"):
     create_vectorstore()
-    st.rerun()
+
 
 # 📂 Arquivos indexados
 st.sidebar.markdown("📂 **Arquivos indexados:**")
@@ -156,46 +160,6 @@ if st.session_state["indexed_files"]:
         st.sidebar.markdown(f"- `{f}`")
 else:
     st.sidebar.info("Nenhum arquivo indexado ainda.")
-
-# 👁️ Visualizador de arquivo
-st.sidebar.markdown("👁️ **Visualizar arquivo:**")
-indexed_files = st.session_state.get("indexed_files", [])
-selected_file = st.sidebar.selectbox(
-    "Selecione um arquivo para visualizar",
-    options=indexed_files if indexed_files else [],
-    index=0 if indexed_files else None,
-    placeholder="Nenhum arquivo indexado"
-)
-
-if selected_file:
-    file_path = os.path.join(DOCS_PATH, selected_file)
-    ext = os.path.splitext(file_path)[1].lower()
-
-    try:
-        # Detecta e usa o loader adequado
-        if ext == ".pdf":
-            loader = PyPDFLoader(file_path)
-        elif ext == ".txt":
-            loader = TextLoader(file_path)
-        elif ext == ".docx":
-            loader = UnstructuredWordDocumentLoader(file_path)
-        elif ext == ".xlsx":
-            loader = UnstructuredExcelLoader(file_path)
-        elif ext == ".html":
-            loader = UnstructuredHTMLLoader(file_path)
-        else:
-            st.sidebar.warning("Tipo de arquivo não suportado para visualização.")
-            loader = None
-
-        if loader:
-            docs = loader.load()
-            preview = docs[0].page_content[:1500]  # Limita a pré-visualização
-            st.sidebar.markdown("📝 **Prévia do conteúdo:**")
-            st.sidebar.code(preview)
-
-    except Exception as e:
-        st.sidebar.error(f"❌ Erro ao visualizar: {e}")
-
 
 # 🚀 Inicializa o LLM
 llm = load_llm()
@@ -264,14 +228,3 @@ if st.session_state.chat_history:
             st.download_button("📥 Baixar última resposta", msg, file_name="resposta.txt")
             break
 
-
-
-def save_indexed_files(file_list):
-    with open(INDEXED_LIST_PATH, "w", encoding="utf-8") as f:
-        json.dump(file_list, f, ensure_ascii=False, indent=2)
-
-def load_indexed_files():
-    if os.path.exists(INDEXED_LIST_PATH):
-        with open(INDEXED_LIST_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
