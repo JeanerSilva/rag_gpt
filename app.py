@@ -3,8 +3,7 @@ import glob
 import hashlib
 import streamlit as st
 
-# ✅ PRIMEIRA LINHA DO STREAMLIT
-st.set_page_config(page_title="Chat RAG GPT", page_icon="🧠")
+st.set_page_config(page_title="Pergunte ao PPA", page_icon="")
 
 from dotenv import load_dotenv
 from langchain_community.document_loaders import (
@@ -90,16 +89,26 @@ def load_vectorstore():
     files = sorted(glob.glob(f"{DOCS_PATH}/*"))
     file_names = [os.path.basename(f) for f in files if os.path.isfile(f)]
 
+    force = st.session_state.pop("force_reindex", False)
+
     hash_changed = (
         "last_docs_hash" not in st.session_state or
         st.session_state["last_docs_hash"] != current_hash or
-        not os.path.exists(os.path.join(VECTORDB_PATH, "index.faiss"))
+        not os.path.exists(os.path.join(VECTORDB_PATH, "index.faiss")) or
+        force  # 👈 força manual
     )
 
     if hash_changed:
         st.session_state["last_docs_hash"] = current_hash
         st.session_state["indexed_files"] = file_names
         return create_vectorstore()
+
+    if "indexed_files" not in st.session_state:
+        st.session_state["indexed_files"] = file_names
+
+    embeddings = load_embeddings()
+    return FAISS.load_local(VECTORDB_PATH, embeddings, allow_dangerous_deserialization=True)
+
 
     if "indexed_files" not in st.session_state:
         st.session_state["indexed_files"] = file_names
@@ -127,10 +136,21 @@ if uploaded_files:
 
 # 🔘 Botão para reindexar manualmente
 if st.sidebar.button("🔁 Reindexar agora"):
+    # Remove o hash anterior para forçar a reindexação
     if "last_docs_hash" in st.session_state:
         del st.session_state["last_docs_hash"]
-    st.sidebar.info("Reindexando...")
+
+    # Atualiza lista de arquivos
+    files = sorted(glob.glob(f"{DOCS_PATH}/*"))
+    file_names = [os.path.basename(f) for f in files if os.path.isfile(f)]
+    st.session_state["indexed_files"] = file_names
+
+    # Força mensagem de reindexação via variável de estado
+    st.session_state["force_reindex"] = True
+
+    # Recarrega o app
     st.rerun()
+
 
 # 🚀 Inicializa
 llm = load_llm()
@@ -187,9 +207,14 @@ if "last_contexts" in st.session_state:
             st.markdown("---")
 
 # 🧹 Botão limpar
-if st.button("🗑️ Limpar conversa"):
+if st.button("🧹 Limpar conversa"):
     st.session_state.chat_history = []
     st.session_state.last_contexts = []
+    try:
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
+
 
 # 💾 Download da última resposta
 if st.session_state.chat_history:
